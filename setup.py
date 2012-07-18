@@ -22,7 +22,7 @@ setup(
     author_email='adam@ahri.net',
     description='Backend agnostic REST API provider for Flask',
     long_description=__doc__,
-    py_modules=['flask_snooze']
+    py_modules=['flask_snooze'],
     test_suite="nose.collector",
     zip_safe=False,
     platforms='any',

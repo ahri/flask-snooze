@@ -1,0 +1,10 @@
+.*.swp
+*.pyc
+dist/
+*.egg-info/
+bin/
+build/
+include/
+lib/
+man/
+lib64

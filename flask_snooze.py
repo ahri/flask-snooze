@@ -19,7 +19,11 @@ e.g.
 
 from flask import request, make_response
 import re
-import json
+
+try:
+    import simplejson as json
+except ImportError:
+    import json
 
 
 class NotFoundError(Exception):

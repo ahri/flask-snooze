@@ -6,8 +6,12 @@ from flask.ext.sqlalchemy import SQLAlchemy
 from flask.ext.snooze import Snooze, SqlAlchemyEndpoint
 from sqlalchemy.orm import object_mapper
 from datetime import datetime
-import json
 import re
+
+try:
+    import simplejson as json
+except ImportError:
+    import json
 
 """
 Api Manager Tests

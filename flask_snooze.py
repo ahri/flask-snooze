@@ -32,14 +32,14 @@ class NotFoundError(Exception):
     Resource not found.
     """
 
-    def __init__(self, cls, obj_id):
+    def __init__(self, cls, path):
         super(NotFoundError, self).__init__()
 
         self.cls = cls
-        self.obj_id = obj_id
-        self.message = 'No %(cls)s exists with an ID of %(obj_id)s' % dict(
+        self.path = path
+        self.message = 'No %(cls)s exists with an ID of %(path)s' % dict(
             cls=cls.__name__,
-            obj_id=obj_id
+            path=path
         )
 
 
@@ -50,19 +50,15 @@ def error_dict(etype, message, **kwargs):
     return d
 
 
-def wrap_verb_call(call, pass_obj_id, endpoint, data_in, data_out):
+def wrap_verb_call(call, endpoint, data_in, data_out):
     """
-    Construct a callback that will wrap a given HTTP Verb call, optionally
-    passing an object ID.
+    Construct a callback that will wrap a given HTTP Verb call, passing a path.
     """
-    def f(obj_id=None):
+    def f(path=None):
         data = data_in(request.data) if request.data != '' else dict()
         assert isinstance(data, dict), "Data must be a dict"
         try:
-            if pass_obj_id:
-                res = call(endpoint, obj_id, data)
-            else:
-                res = call(endpoint, data)
+            res = call(endpoint, path, data)
             try:
                 # NB. error_data used because Flask stringifies stuff we put
                 #     into res.data, which isn't good for us
@@ -79,7 +75,7 @@ def wrap_verb_call(call, pass_obj_id, endpoint, data_in, data_out):
                 'etype': type(e).__name__,
                 'message': e.message,
                 'class': e.cls.__name__,
-                'id': e.obj_id
+                'path': e.path
             }))
         except:
             import sys
@@ -118,8 +114,7 @@ class Snooze(object):
         self._routes = {}
 
     def add(self, endpoint, name=None, methods=(
-            'OPTIONS', 'LIST', 'POST',
-            'GET', 'PUT', 'PATCH', 'DELETE')):
+            'OPTIONS', 'POST', 'GET', 'PUT', 'PATCH', 'DELETE')):
         """
         Add an endpoint for a class, the name defaults to a lowercase version
         of the class name but can be overriden.
@@ -130,38 +125,16 @@ class Snooze(object):
         obj_name = endpoint.cls.__name__.lower() if name is None else name
         methods = [m.upper() for m in methods]
 
-        for verb in 'OPTIONS', 'LIST', 'POST':
+        for verb in 'OPTIONS', 'POST', 'GET', 'PUT', 'PATCH', 'DELETE':
             if verb not in methods:
                 continue
 
             l = wrap_verb_call(call=getattr(self, '_%s' % verb.lower()),
-                               pass_obj_id=False,
-                               endpoint=endpoint,
-                               data_in=self._hook_data_in,
-                               data_out=self._hook_data_out)
-
-            # A bit of a hack, but this use of GET seems like a seperate verb
-            # to me, hence LIST
-            if verb == 'LIST':
-                verb = 'GET'
-
-            self._register(obj_name=obj_name,
-                           needs_id=False,
-                           verb=verb,
-                           func=l)
-
-        for verb in 'GET', 'PUT', 'PATCH', 'DELETE':
-            if verb not in methods:
-                continue
-
-            l = wrap_verb_call(call=getattr(self, '_%s' % verb.lower()),
-                               pass_obj_id=True,
                                endpoint=endpoint,
                                data_in=self._hook_data_in,
                                data_out=self._hook_data_out)
 
             self._register(obj_name=obj_name,
-                           needs_id=True,
                            verb=verb,
                            func=l)
 
@@ -169,17 +142,11 @@ class Snooze(object):
     # Verbs
     #
 
-    def _options(self, endpoint, data):
+    def _options(self, endpoint, path, data):
         """HTTP Verb endpoint"""
         return self._routes
 
-    def _list(self, endpoint, data):
-        """HTTP Verb endpoint (GET without an ID)"""
-        # NB. to add a filter_by() to this, stick it before .all() as that
-        # executes the query
-        return endpoint.list_ids()
-
-    def _post(self, endpoint, data):
+    def _post(self, endpoint, path, data):
         """HTTP Verb endpoint"""
         o = endpoint.create()
         if data is not None:
@@ -187,22 +154,25 @@ class Snooze(object):
 
         return response_redirect(endpoint, o, 201)
 
-    def _get(self, endpoint, obj_id, data):
+    def _get(self, endpoint, path, data):
         """HTTP Verb endpoint"""
-        o = endpoint.read(obj_id)
+        if path is None:
+            return endpoint.list_ids()
+
+        o = endpoint.read(path)
 
         if isinstance(o, dict):
             return o
 
         return dict(o)
 
-    def _put(self, endpoint, obj_id, data):
+    def _put(self, endpoint, path, data):
         """HTTP Verb endpoint"""
         created = False
         try:
-            o = endpoint.read(obj_id)
+            o = endpoint.read(path)
         except NotFoundError:
-            o = endpoint.create(obj_id)
+            o = endpoint.create(path)
             created = True
 
         self._fill(endpoint, o, data)
@@ -210,14 +180,14 @@ class Snooze(object):
         if created:
             return response_redirect(endpoint, o, 201)
 
-    def _patch(self, endpoint, obj_id, data):
+    def _patch(self, endpoint, path, data):
         """HTTP Verb endpoint"""
-        o = endpoint.read(obj_id)
+        o = endpoint.read(path)
         self._update(endpoint, o, data)
 
-    def _delete(self, endpoint, obj_id, data):
+    def _delete(self, endpoint, path, data):
         """HTTP Verb endpoint"""
-        endpoint.delete(obj_id)
+        endpoint.delete(path)
 
     #
     # Tools
@@ -240,15 +210,26 @@ class Snooze(object):
 
         self._update(endpoint, o, data)
 
-    def _register(self, obj_name, needs_id, verb, func):
+    def _register(self, obj_name, verb, func):
         func.provide_automatic_options = False
-        route = '/%s/%s' % (obj_name, '<obj_id>' if needs_id else '')
+
+        route = '/%s/<path:path>' % obj_name
         self._app.route(route,
                         methods=(verb,),
-                        endpoint="%s:%s/%s" % (verb,
-                                                obj_name,
-                                                '<obj_id>' if needs_id \
-                                                            else ''))(func)
+                        endpoint="%s:%s" % (verb, route))(func)
+
+        self._reg_options(verb, route)
+
+        if verb in ('OPTIONS', 'GET', 'POST'):
+            route = '/%s/' % obj_name
+            self._app.route(route,
+                            methods=(verb,),
+                            endpoint="%s:%s" % (verb, route),
+                            defaults={'path': None})(func)
+
+            self._reg_options(verb, route)
+
+    def _reg_options(self, verb, route):
         verbs = self._routes.get(route, [])
         verbs.append(verb)
         if verb == 'GET':
@@ -277,11 +258,11 @@ class Endpoint(object):
         """List all accessible ids"""
         raise NotImplementedError()
 
-    def create(self):
+    def create(self, path=None):
         """Create a new object"""
         raise NotImplementedError()
 
-    def read(self, obj_id):
+    def read(self, path):
         """Load an existing object"""
         raise NotImplementedError()
 
@@ -289,7 +270,7 @@ class Endpoint(object):
         """Save an object (if required)"""
         raise NotImplementedError()
 
-    def delete(self, obj_id):
+    def delete(self, path):
         """Delete the data for the provided ID"""
         raise NotImplementedError()
 
@@ -319,22 +300,22 @@ class SqlAlchemyEndpoint(Endpoint):
         return [pk[0] for pk in \
             self.db.session.query(self.pk).all()]
 
-    def create(self, obj_id=None):
+    def create(self, path=None):
         o = self.cls()
-        if obj_id is not None:
-            setattr(o, self.id_key, obj_id)
+        if path is not None:
+            setattr(o, self.id_key, path)
         return o
 
-    def read(self, obj_id):
+    def read(self, path):
         try:
-            return self.cls.query.filter(self.pk == obj_id).all()[0]
+            return self.cls.query.filter(self.pk == path).all()[0]
         except IndexError:
-            raise NotFoundError(self.cls, obj_id)
+            raise NotFoundError(self.cls, path)
 
     def finalize(self, obj):
         self.db.session.add(obj)
         self.db.session.commit()
 
-    def delete(self, obj_id):
-        o = self.read(obj_id)
+    def delete(self, path):
+        o = self.read(path)
         self.db.session.delete(o)

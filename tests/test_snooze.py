@@ -159,7 +159,7 @@ class TestSnoozeDirect(TestCase):
         self.assertNotIn('/%s/' % obj_name, [r.rule for r in self.app.url_map.iter_rules()])
         apimgr.add(SqlAlchemyEndpoint(self.db, self.Book, ['title']), methods=('PUT', 'PATCH'))
         methods = set()
-        [methods.update(r.methods) for r in self.app.url_map.iter_rules() if r.rule == '/%s/<obj_id>' % obj_name]
+        [methods.update(r.methods) for r in self.app.url_map.iter_rules() if r.rule == '/%s/<path:path>' % obj_name]
         self.assertEqual(methods, set(['PUT', 'PATCH']))
 
     def test_no_auto_OPTIONS(self):
@@ -168,7 +168,7 @@ class TestSnoozeDirect(TestCase):
         obj_name = 'book'
         apimgr.add(SqlAlchemyEndpoint(self.db, self.Book, ['title']), methods=('PUT',))
         methods = set()
-        [methods.update(r.methods) for r in self.app.url_map.iter_rules() if r.rule == '/%s/<obj_id>' % obj_name]
+        [methods.update(r.methods) for r in self.app.url_map.iter_rules() if r.rule == '/%s/<path:path>' % obj_name]
         self.assertNotIn('OPTIONS', methods)
 
 
@@ -209,6 +209,7 @@ class TestSnoozeHttp(FlaskTestCase):
         """Test a simple GET against the root of the object API (asking for a "LIST")"""
         apimgr = self.create_mgr()
         apimgr.add(SqlAlchemyEndpoint(self.db, self.Book, ['title']))
+        print [(r.rule, r.methods, r.endpoint) for r in self.app.url_map.iter_rules()]
         self.assert_not_4xx(self.client.get('/book/'))
 
     def test_rule_post(self):
@@ -260,7 +261,8 @@ class TestSnoozeHttp(FlaskTestCase):
         options = json.loads(response.data)
         print repr(options)
         self.assertEqual(set(('OPTIONS', 'GET', 'HEAD', 'POST')), set(options['/book/']))
-        self.assertEqual(set(('GET', 'HEAD', 'PUT', 'PATCH', 'DELETE')), set(options['/book/<obj_id>']))
+        print [(r.rule, r.methods, r.endpoint) for r in self.app.url_map.iter_rules()]
+        self.assertEqual(set(('OPTIONS', 'GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE')), set(options['/book/<path:path>']))
 
     def test_verb_list(self):
         apimgr = self.create_mgr()
@@ -352,8 +354,8 @@ class TestSnoozeHttp(FlaskTestCase):
         self.assertIn('detail', data)
         self.assertIn('class', data['detail'])
         self.assertEqual(data['detail']['class'], 'Book')
-        self.assertIn('id', data['detail'])
-        self.assertEqual(data['detail']['id'], 'dummy')
+        self.assertIn('path', data['detail'])
+        self.assertEqual(data['detail']['path'], 'dummy')
 
     def test_verb_head(self):
         apimgr = self.create_mgr()

@@ -275,6 +275,11 @@ class Endpoint(object):
         raise NotImplementedError()
 
 
+#
+# SQLAlchemy Land
+#
+
+
 def row2dict(row):
     """
     Convert a SQLAlchemy row/object to a dict, found on:

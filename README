@@ -3,7 +3,6 @@ Backend-agnostic REST API provider for Flask. And it's simple, too!
 e.g.
 
     from flask import app, Blueprint
-    from flask.ext.sqlalchemy import SQLAlchemy
     from flask.ext.snooze import Snooze, SqlAlchemyEndpoint
     from my_model import sqlalchemy_db, Book
 

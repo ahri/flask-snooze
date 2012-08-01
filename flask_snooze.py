@@ -148,7 +148,7 @@ class Snooze(object):
 
     def _post(self, endpoint, path, data):
         """HTTP Verb endpoint"""
-        o = endpoint.create()
+        o = endpoint.create(path)
         if data is not None:
             self._fill(endpoint, o, data)
 

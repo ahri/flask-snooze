@@ -78,7 +78,40 @@ HTTP Protocol reference: http://www.w3.org/Protocols/rfc2616/rfc2616-sec9.html
 
 
 class DummyEndpoint(Endpoint):
-    pass
+
+    """
+    Base Endpoint object.
+    """
+
+    def __init__(self, cls, id_key, writeable_keys):
+        """
+        cls:            Class of object being represented by this endpoint
+        id_key:         Identifying key of an object
+        writeable_keys: A list of keys that may be written to on an object
+        """
+        super(DummyEndpoint, self).__init__(cls, id_key, writeable_keys)
+
+        self.calls = []
+
+    def list_ids(self, path=None):
+        """List all accessible ids"""
+        self.calls.append(('list_ids', dict(path=path)))
+
+    def create(self, path=None):
+        """Create a new object"""
+        self.calls.append(('create', dict(path=path)))
+
+    def read(self, path):
+        """Load an existing object"""
+        self.calls.append(('read', dict(path=path)))
+
+    def finalize(self, obj):
+        """Save an object (if required)"""
+        self.calls.append(('finalize', dict(obj=obj)))
+
+    def delete(self, path):
+        """Delete the data for the provided ID"""
+        self.calls.append(('delete', dict(path=path)))
 
 
 def print_tb(response):
@@ -181,3 +214,70 @@ class TestSnoozeHttp(FlaskTestCase):
         self.assertEqual(set(('OPTIONS', 'GET', 'HEAD', 'POST')), set(options['/object/']))
         print [(r.rule, r.methods, r.endpoint) for r in self.app.url_map.iter_rules()]
         self.assertEqual(set(('OPTIONS', 'GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE')), set(options['/object/<path:path>']))
+
+
+class TestExerciseEndpoint(FlaskTestCase):
+
+    """
+    Exercise the verbs using a dummy endpoint to record calls.
+    """
+
+    def create_app(self):
+        """Create a Flask app"""
+        self.app = Flask(__name__)
+        self.app.config['TESTING'] = True
+        return self.app
+
+    def setUp(self):
+        self.endpoint = DummyEndpoint(object, None, None)
+        self.mgr = Snooze(self.app)
+        self.mgr.add(self.endpoint)
+        print [(r.rule, r.methods, r.endpoint) for r in self.app.url_map.iter_rules()]
+
+    def test_post_no_path(self):
+        path = ''
+        self.client.post('/object/%s' % path)
+        self.assertEqual(self.endpoint.calls, [('create', dict(path=None))])
+
+    def test_post_path(self):
+        path = 'foo'
+        self.client.post('/object/%s' % path)
+        self.assertEqual(self.endpoint.calls, [('create', dict(path=path))])
+
+    def test_get_no_path(self):
+        path = ''
+        self.client.get('/object/%s' % path)
+        self.assertEqual(self.endpoint.calls, [('list_ids', dict(path=None))])
+
+    def test_get_path(self):
+        path = 'foo'
+        self.client.get('/object/%s' % path)
+        self.assertEqual(self.endpoint.calls, [('read', dict(path=path))])
+
+    def test_put_no_path(self):
+        path = ''
+        self.assert_status(self.client.put('/object/%s' % path), 405)
+
+    def test_put_path(self):
+        path = 'foo'
+        self.client.put('/object/%s' % path)
+        self.assertEqual(self.endpoint.calls, [('read', dict(path=path))])
+
+    def test_patch_no_path(self):
+        path = ''
+        self.assert_status(self.client.patch('/object/%s' % path), 405)
+
+    def test_patch_path(self):
+        path = 'foo'
+        self.client.patch('/object/%s' % path)
+        self.assertEqual(self.endpoint.calls, [('read', dict(path=path)),
+                                               ('finalize', dict(obj=None))])
+
+    def test_delete_no_path(self):
+        path = ''
+        self.assert_status(self.client.delete('/object/%s' % path), 405)
+
+    def test_delete_path(self):
+        path = 'foo'
+        self.client.delete('/object/%s' % path)
+        self.assertEqual(self.endpoint.calls, [('delete', dict(path=path))])

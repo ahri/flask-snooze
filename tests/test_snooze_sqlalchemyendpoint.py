@@ -21,8 +21,11 @@ HTTP Protocol reference: http://www.w3.org/Protocols/rfc2616/rfc2616-sec9.html
 def print_tb(response):
     from traceback import format_list
     try:
-        print '\n'.join(format_list(response.json['detail']['traceback']))
-    except TypeError:
+        response = response.json
+        print response['message']
+        print
+        print '\n'.join(format_list(response['detail']['traceback']))
+    except (TypeError, KeyError):
         pass  # don't care
 
 
@@ -155,9 +158,9 @@ class TestSnoozeHttp(FlaskTestCase):
         self.db.session.add(b3)
         self.db.session.flush()
 
-        data = self.client.get('/book/').data
-        print data
-        lst = json.loads(data)
+        response = self.client.get('/book/')
+        print_tb(response)
+        lst = json.loads(response.data)
         self.assertEqual(set([b.id for b in (b1, b2, b3)]), set(lst))
 
     def test_verb_post(self):
@@ -207,8 +210,8 @@ class TestSnoozeHttp(FlaskTestCase):
         self.db.session.flush()
 
         response = self.client.get('/book/%s' % book.id)
+        print_tb(response)
         data = json.loads(response.data)
-        print data
         self.assertEqual(data['title'], book.title)
 
     def test_verb_get_404(self):

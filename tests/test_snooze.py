@@ -93,10 +93,6 @@ class DummyEndpoint(Endpoint):
 
         self.calls = []
 
-    def list_ids(self, path=None):
-        """List all accessible ids"""
-        self.calls.append(('list_ids', dict(path=path)))
-
     def create(self, path=None):
         """Create a new object"""
         self.calls.append(('create', dict(path=path)))
@@ -104,6 +100,8 @@ class DummyEndpoint(Endpoint):
     def read(self, path):
         """Load an existing object"""
         self.calls.append(('read', dict(path=path)))
+        if path is None:
+            return []
 
     def finalize(self, obj):
         """Save an object (if required)"""
@@ -117,8 +115,11 @@ class DummyEndpoint(Endpoint):
 def print_tb(response):
     from traceback import format_list
     try:
-        print '\n'.join(format_list(response.json['detail']['traceback']))
-    except TypeError:
+        response = response.json
+        print response['message']
+        print
+        print '\n'.join(format_list(response['detail']['traceback']))
+    except (TypeError, KeyError):
         pass  # don't care
 
 
@@ -215,6 +216,13 @@ class TestSnoozeHttp(FlaskTestCase):
         print [(r.rule, r.methods, r.endpoint) for r in self.app.url_map.iter_rules()]
         self.assertEqual(set(('OPTIONS', 'GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE')), set(options['/object/<path:path>']))
 
+    # check that lists behave properly
+    def test_list(self):
+        apimgr = self.create_mgr()
+        apimgr.add(DummyEndpoint(object, None, None))
+        response = self.client.get('/object/')
+        self.assertIsInstance(response.json, list)
+
 
 class TestExerciseEndpoint(FlaskTestCase):
 
@@ -247,7 +255,7 @@ class TestExerciseEndpoint(FlaskTestCase):
     def test_get_no_path(self):
         path = ''
         self.client.get('/object/%s' % path)
-        self.assertEqual(self.endpoint.calls, [('list_ids', dict(path=None))])
+        self.assertEqual(self.endpoint.calls, [('read', dict(path=None))])
 
     def test_get_path(self):
         path = 'foo'

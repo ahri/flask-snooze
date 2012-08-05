@@ -156,15 +156,25 @@ class Snooze(object):
 
     def _get(self, endpoint, path, data):
         """HTTP Verb endpoint"""
-        if path is None:
-            return endpoint.list_ids()
-
         o = endpoint.read(path)
 
-        if isinstance(o, dict):
-            return o
+        def readable(o):
+            """Based on JSON primitives"""
+            if type(o) in (
+                    dict,
+                    list, tuple,
+                    str, unicode,
+                    int, long, float,
+                    bool,
+                    None):
+                return o
 
-        return dict(o)
+            return dict(o)
+
+        if isinstance(o, list):
+            return [readable(i) for i in o]
+        else:
+            return readable(o)
 
     def _put(self, endpoint, path, data):
         """HTTP Verb endpoint"""
@@ -254,10 +264,6 @@ class Endpoint(object):
         self.id_key = id_key
         self.writeable_keys = writeable_keys
 
-    def list_ids(self):
-        """List all accessible ids"""
-        raise NotImplementedError()
-
     def create(self, path=None):
         """Create a new object"""
         raise NotImplementedError()
@@ -301,10 +307,6 @@ class SqlAlchemyEndpoint(Endpoint):
         self.pk = class_mapper(cls).primary_key[0]
         super(SqlAlchemyEndpoint, self).__init__(cls, self.pk.name, items)
 
-    def list_ids(self):
-        return [pk[0] for pk in \
-            self.db.session.query(self.pk).all()]
-
     def create(self, path=None):
         o = self.cls()
         if path is not None:
@@ -312,6 +314,10 @@ class SqlAlchemyEndpoint(Endpoint):
         return o
 
     def read(self, path):
+        if path == None:
+            return [pk[0] for pk in \
+                self.db.session.query(self.pk).all()]
+
         try:
             return self.cls.query.filter(self.pk == path).all()[0]
         except IndexError:

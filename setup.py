@@ -15,7 +15,7 @@ from setuptools import setup
 
 setup(
     name='Flask-Snooze',
-    version='0.1.5',
+    version='0.1.6',
     url='http://github.com/ahri/flask-snooze',
     license='MIT',
     author='Adam Piper',

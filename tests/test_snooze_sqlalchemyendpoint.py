@@ -326,6 +326,7 @@ class TestSnoozeHttp(FlaskTestCase):
         book_id = book.id
 
         response = self.client.delete('/book/%s' % book.id)
+        print_tb(response)
         self.assert_200(response)
         book = self.Book.query.filter_by(id=book_id).first()
         self.assertIs(book, None)

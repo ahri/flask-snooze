@@ -50,6 +50,26 @@ def error_dict(etype, message, **kwargs):
     return d
 
 
+class CoerceToDictEncoder(json.JSONEncoder):
+
+    """
+    A fairly naive encoder that will try to convert unrecognised types to dict.
+    The idea being that objects can be made iterable quite easily as a bridge
+    to being converted to JSON.
+    """
+
+    def default(self, obj):
+        if obj is None or type(obj) in (
+                dict,
+                list, tuple,
+                str, unicode,
+                int, long, float,
+                bool):
+            return json.JSONEncoder.default(self, obj)
+
+        return dict(obj)
+
+
 def wrap_verb_call(call, endpoint, data_in, data_out):
     """
     Construct a callback that will wrap a given HTTP Verb call, passing a path.
@@ -110,7 +130,7 @@ class Snooze(object):
         self._app = app
         hooks = dict() if hooks is None else hooks
         self._hook_data_in = hooks.get('data_in', json.loads)
-        self._hook_data_out = hooks.get('data_out', json.dumps)
+        self._hook_data_out = hooks.get('data_out', CoerceToDictEncoder().encode)
         self._routes = {}
 
     def add(self, endpoint, name=None, methods=(
@@ -156,25 +176,7 @@ class Snooze(object):
 
     def _get(self, endpoint, path, data):
         """HTTP Verb endpoint"""
-        o = endpoint.read(path)
-
-        def readable(o):
-            """Based on JSON primitives"""
-            if type(o) in (
-                    dict,
-                    list, tuple,
-                    str, unicode,
-                    int, long, float,
-                    bool,
-                    None):
-                return o
-
-            return dict(o)
-
-        if isinstance(o, list):
-            return [readable(i) for i in o]
-        else:
-            return readable(o)
+        return endpoint.read(path)
 
     def _put(self, endpoint, path, data):
         """HTTP Verb endpoint"""

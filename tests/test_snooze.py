@@ -47,35 +47,6 @@ HTTP Protocol reference: http://www.w3.org/Protocols/rfc2616/rfc2616-sec9.html
 #       TRACE:
 #           Probably best to ignore this for now.
 
-# TODO: selective auth per "add"
-# TODO: basic auth function generator
-#
-# TODO: try to set properties (in ._update()) with a method, e.g.
-#       rest_set(p, v, auth=False) so that the user can control access
-#       the auth param can be an item passed back from the auth function
-#       hook, for similar reasons
-
-
-# TODO: don't throw back tracebacks unless debug is switched on (i.e. add a
-#       debug switch)
-
-# TODO: see auth status of verbs in OPTIONS
-
-# TODO: Support:
-#           If-Modified-Since, If-Unmodified-Since, If-Match,
-#           If-None-Match, If-Range
-
-# TODO: Ensure that Content-Length, Content-MD5, ETag and Last-Modified
-#           are sent.
-
-# GET/OPTIONS support needs neatening up
-# /api_v1
-#   GET: lists objects
-#   OPTIONS: lists objects and supported verbs for them, including auth_reqd
-# /api_v1/obj_name
-#   GET: give all objects (pagination??)
-#   OPTIONS: lists supported verbs, including auth_reqd
-
 
 class DummyEndpoint(Endpoint):
 

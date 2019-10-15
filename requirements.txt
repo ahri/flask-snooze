@@ -1,4 +1,4 @@
-Flask==0.8
+Flask==1.0
 Flask-SQLAlchemy==0.16
 Flask-Testing==0.3
 Jinja2==2.6
